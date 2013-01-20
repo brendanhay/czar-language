@@ -135,9 +135,15 @@ angles = P.angles lexer
 brackets :: ParseT a b -> ParseT a b
 brackets = P.brackets lexer
 
-tTrue, tFalse :: ParseT a Bool
-tTrue  = res "true" True
-tFalse = res "false" False
+commaSep :: ParseT a b -> ParseT a [b]
+commaSep = P.commaSep lexer
+
+commaSep1 :: ParseT a b -> ParseT a [b]
+commaSep1 = P.commaSep1 lexer
+
+true, false :: ParseT a Bool
+true  = res "true" True
+false = res "false" False
 
 tNot, tAnd, tOr, tGreater, tLess :: a -> ParseT b a
 tNot     = op "!"

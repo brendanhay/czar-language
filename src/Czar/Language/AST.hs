@@ -12,8 +12,6 @@
 
 module Czar.Language.AST where
 
--- import Data.String
-
 type Ident = String
 
 newtype ModName = ModName Ident
@@ -63,22 +61,17 @@ data Stmt
 
 data Exp
     = EVar Ident
-    | ERef RefName
     | ELet Ident Exp
     | ELit Literal
-    | EBin BinExp
-    | ENum NumExp
-    | EList [Exp]
     | ETuple [Exp]
+    | EApp Exp Exp
+    | ENeg Exp
+    | EBin Exp BinOp Exp
+    | ERel Exp RelOp Exp
+    | ENum Exp NumOp Exp
     | EIf Exp Exp Exp
     | ECase Exp [(Pattern, Exp)]
   deriving (Show)
-
-refExp :: Ident -> Ident -> Exp
-refExp mod' = ERef . RefName (ModName mod')
-
-boolExp :: Bool -> Exp
-boolExp = EBin . BBool
 
 data Pattern
     = PVar Ident
@@ -90,28 +83,17 @@ data Pattern
 data Literal
     = LChar Char
     | LString String
-    | LList [Literal]
-    | LTuple [Literal]
-  deriving (Show)
-
-data BinExp
-    = BBool Bool
-    | BNeg BinExp
-    | BExp BinOp BinExp BinExp
-    | RExp RelOp NumExp NumExp
+    | LBool Bool
+    | LInt Integer
+    | LFloat Double
+    | LCons
+    | LNil
   deriving (Show)
 
 data BinOp = And | Or
   deriving (Show)
 
 data RelOp = Greater | Less
-  deriving (Show)
-
-data NumExp
-    = NInt Integer
-    | NFloat Double
-    | NNeg NumExp
-    | NExp NumOp NumExp NumExp
   deriving (Show)
 
 data NumOp
@@ -121,3 +103,39 @@ data NumOp
     | Divide
   deriving (Show)
 
+infixl 9 @@
+(@@) :: Exp -> Exp -> Exp
+e1 @@ e2 = EApp e1 e2
+
+litInt :: Integer -> Exp
+litInt = ELit . LInt
+
+litFloat :: Double -> Exp
+litFloat = ELit . LFloat
+
+litChar :: Char -> Exp
+litChar = ELit . LChar
+
+litString :: String -> Exp
+litString = ELit . LString
+
+litBool :: Bool -> Exp
+litBool = ELit . LBool
+
+litCons :: Exp
+litCons = ELit LCons
+
+litNil :: Exp
+litNil = ELit LNil
+
+var :: Ident -> Exp
+var = EVar
+
+list :: [Exp] -> Exp
+list = foldr cons litNil
+
+cons :: Exp -> Exp -> Exp
+cons hd tl = litCons @@ hd @@ tl
+
+tuple :: [Exp] -> Exp
+tuple = ETuple

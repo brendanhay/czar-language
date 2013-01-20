@@ -12,19 +12,36 @@
 
 module Czar.Language.Parser where
 
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative   ((<$>), (<*>))
 import Czar.Language.AST
 import Czar.Language.Lexer
+import Data.Functor.Identity (Identity)
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
 
-expParser :: Parser Exp
-expParser = buildExpressionParser table termParser <?> "expression"
+type Operators = [[Operator String () Identity Exp]]
 
-table :: [a]
-table =
-    [
+expParser :: Parser Exp
+expParser = buildExpressionParser operators termParser <?> "expression"
+
+operators :: Operators
+operators = arithmeticOps ++ booleanOps
+
+arithmeticOps :: Operators
+arithmeticOps =
+    [ [Prefix (aSubtract ENeg)]
+    , [Infix  (aAdd      (ENum Add))      AssocLeft]
+    , [Infix  (aSubtract (ENum Subtract)) AssocLeft]
+    , [Infix  (aMultiply (ENum Multiply)) AssocLeft]
+    , [Infix  (aDivide   (ENum Divide))   AssocLeft]
+    ]
+
+booleanOps :: Operators
+booleanOps =
+    [ [Prefix (bNot ENeg)]
+    , [Infix  (bAnd (EBin And)) AssocLeft]
+    , [Infix  (bOr  (EBin Or)) AssocLeft]
     ]
 
 termParser :: Parser Exp
@@ -44,7 +61,6 @@ letExpParser = do
 listParser :: Parser Exp
 listParser = list <$> brackets (commaSep expParser)
 
--- Parenthesised expression or a tuple
 parenParser :: Parser Exp
 parenParser = do
     xs <- parens (commaSep1 expParser)

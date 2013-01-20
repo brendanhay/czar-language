@@ -162,12 +162,20 @@ true, false :: ParseT a Bool
 true  = res "true" True
 false = res "false" False
 
-tNot, tAnd, tOr, tGreater, tLess :: a -> ParseT b a
-tNot     = op "!"
-tAnd     = op "&&"
-tOr      = op "||"
-tGreater = op ">"
-tLess    = op "<"
+bNot, bAnd, bOr :: a -> ParseT b a
+bNot = op "!"
+bAnd = op "&&"
+bOr  = op "||"
+
+rGreater, rLess :: a -> ParseT b a
+rGreater = op ">"
+rLess    = op "<"
+
+aAdd, aSubtract, aMultiply, aDivide :: a -> ParseT b a
+aAdd      = op "+"
+aSubtract = op "-"
+aMultiply = op "*"
+aDivide   = op "/"
 
 res, op :: String -> a -> ParseT b a
 res = f reserved

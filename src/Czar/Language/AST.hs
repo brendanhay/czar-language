@@ -66,9 +66,9 @@ data Exp
     | ETuple [Exp]
     | EApp Exp Exp
     | ENeg Exp
-    | EBin Exp BinOp Exp
-    | ERel Exp RelOp Exp
-    | ENum Exp NumOp Exp
+    | EBin BinOp Exp Exp
+    | ERel RelOp Exp Exp
+    | ENum NumOp Exp Exp
     | EIf Exp Exp Exp
     | ECase Exp [(Pattern, Exp)]
   deriving (Show)

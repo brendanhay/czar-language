@@ -59,7 +59,11 @@ parenParser p tupler = do
               else tupler xs
 
 literalParser :: Parser Exp
-literalParser = boolParser <|> numParser <|> charParser <|> stringParser
+literalParser =
+        boolParser
+    <|> numParser
+    <|> charParser
+    <|> stringParser
 
 boolParser :: Parser Exp
 boolParser = litBool <$> (true <|> false)

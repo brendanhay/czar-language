@@ -13,7 +13,6 @@
 module Czar.Language.Parser where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad       (liftM)
 import Czar.Language.AST
 import Czar.Language.Lexer
 import Text.Parsec
@@ -33,7 +32,7 @@ termParser :: Parser Exp
 termParser = EVar <$> lowerIdent
     <|> letExpParser
     <|> literalParser
-    <|> parenExpParser
+    <|> parenParser
     <|> listParser
 
 letExpParser :: Parser Exp
@@ -47,15 +46,12 @@ listParser :: Parser Exp
 listParser = list <$> brackets (commaSep expParser)
 
 -- Parenthesised expression or a tuple
-parenExpParser :: Parser Exp
-parenExpParser = parenParser expParser tuple
-
-parenParser :: Parser a -> ([a] -> a) -> Parser a
-parenParser p tupler = do
-    xs <- parens (commaSep1 p)
+parenParser :: Parser Exp
+parenParser = do
+    xs <- parens (commaSep1 expParser)
     return $ if length xs == 1
               then head xs
-              else tupler xs
+              else tuple xs
 
 literalParser :: Parser Exp
 literalParser = boolParser
@@ -74,4 +70,3 @@ charParser = litChar <$> charLiteral
 
 stringParser :: Parser Exp
 stringParser = litString <$> stringLiteral
-

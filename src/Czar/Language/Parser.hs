@@ -59,16 +59,17 @@ parenParser p tupler = do
               else tupler xs
 
 literalParser :: Parser Exp
-literalParser =
-        boolParser
-    <|> numParser
-    <|> (litChar   <$> charLiteral)
-    <|> (litString <$> stringLiteral)
-    <|> (litChar   <$> charLiteral)
-    <|> (litString <$> stringLiteral)
+literalParser = boolParser <|> numParser <|> charParser <|> stringParser
 
 boolParser :: Parser Exp
 boolParser = litBool <$> (true <|> false)
 
 numParser :: Parser Exp
 numParser = either litInt litFloat <$> naturalOrFloat
+
+charParser :: Parser Exp
+charParser = litChar <$> charLiteral
+
+stringParser :: Parser Exp
+stringParser = litString <$> stringLiteral
+

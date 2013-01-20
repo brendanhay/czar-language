@@ -18,7 +18,6 @@ import Czar.Language.Lexer
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
--- import Text.Parsec.Language
 
 expParser :: Parser Exp
 expParser = buildExpressionParser table termParser <?> "expression"

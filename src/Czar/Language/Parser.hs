@@ -26,7 +26,7 @@ expParser :: Parser Exp
 expParser = buildExpressionParser operators termParser <?> "expression"
 
 operators :: Operators
-operators = arithmeticOps ++ booleanOps
+operators = arithmeticOps ++ booleanOps ++ relationalOps
 
 arithmeticOps :: Operators
 arithmeticOps =
@@ -41,7 +41,13 @@ booleanOps :: Operators
 booleanOps =
     [ [Prefix (bNot ENeg)]
     , [Infix  (bAnd (EBin And)) AssocLeft]
-    , [Infix  (bOr  (EBin Or)) AssocLeft]
+    , [Infix  (bOr  (EBin Or))  AssocLeft]
+    ]
+
+relationalOps :: Operators
+relationalOps =
+    [ [Infix (rGreater (ERel Greater)) AssocLeft]
+    , [Infix (rLess    (ERel Less))    AssocLeft]
     ]
 
 termParser :: Parser Exp

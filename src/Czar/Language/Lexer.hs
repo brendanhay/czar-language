@@ -171,7 +171,7 @@ rGreater, rLess :: a -> ParseT b a
 rGreater = op ">"
 rLess    = op "<"
 
-aAdd, aSubtract, aMultiply, aDivide :: a -> ParseT b a
+ :: a -> ParseT b a
 aAdd      = op "+"
 aSubtract = op "-"
 aMultiply = op "*"

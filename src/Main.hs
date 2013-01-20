@@ -12,8 +12,9 @@
 
 module Main where
 
-import Czar.Language.Lexer
-import Czar.Language.AST
+import Control.Monad        (forever)
+import Czar.Language.Parser
+import Text.Parsec
 
 main :: IO ()
-main = print "ok!"
+main = forever $ getLine >>= print . parse expParser ""

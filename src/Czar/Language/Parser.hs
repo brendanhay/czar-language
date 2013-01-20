@@ -30,8 +30,7 @@ table =
     ]
 
 termParser :: Parser Exp
-termParser =
-        EVar <$> lowerIdent
+termParser = EVar <$> lowerIdent
     <|> letExpParser
     <|> literalParser
     <|> parenExpParser
@@ -59,8 +58,7 @@ parenParser p tupler = do
               else tupler xs
 
 literalParser :: Parser Exp
-literalParser =
-        boolParser
+literalParser = boolParser
     <|> numParser
     <|> charParser
     <|> stringParser

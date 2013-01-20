@@ -81,15 +81,15 @@ data Casing = Upper | Lower
 -- FIXME: Must be a better way of coercing parsec to
 -- split lower/upper idents
 upperIdent :: ParseT a String
-upperIdent = identifier >>= either
+upperIdent = upperOrLowerIdent >>= either
     return (fail . ("expecting uppercase ident: " ++))
 
 lowerIdent :: ParseT a String
-lowerIdent = identifier >>= either
+lowerIdent = upperOrLowerIdent >>= either
     (fail . ("expecting lowercase ident: " ++)) return
 
-identifier :: ParseT a (Either String String)
-identifier = do
+upperOrLowerIdent :: ParseT a (Either String String)
+upperOrLowerIdent = do
     xs <- P.identifier lexer
     return $ if isUpper (head xs)
               then Left xs

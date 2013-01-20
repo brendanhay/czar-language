@@ -10,9 +10,7 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Czar.Language.Lexer (
-      lexer
-    ) where
+module Czar.Language.Lexer where
 
 import Data.Functor.Identity (Identity)
 import Text.Parsec
@@ -20,7 +18,7 @@ import Text.Parsec.Language  (emptyDef)
 
 import qualified Text.Parsec.Token as P
 
-type Lex a b = ParsecT String a Identity b
+type ParseT a b = ParsecT String a Identity b
 
 lexer :: P.GenTokenParser String a Identity
 lexer = P.makeTokenParser rules
@@ -53,6 +51,8 @@ reservedNames =
     , "case"
     , "of"
     , "_"
+    , "true"
+    , "false"
     ]
 
 reservedOps :: [String]
@@ -60,69 +60,95 @@ reservedOps =
     [ "="
     , "->"
     , ">"
+    , ">="
     , "<"
+    , "=<"
     , "+"
     , "-"
     , "*"
     , "/"
+    , "=~"
+    , "~~"
+    , "=="
+    , "!="
+    , "||"
+    , "&&"
     ]
 
-identifier :: Lex a String
+identifier :: ParseT a String
 identifier = P.identifier lexer
 
-reserved :: String -> Lex a ()
+reserved :: String -> ParseT a ()
 reserved = P.reserved lexer
 
-operator :: Lex a String
+operator :: ParseT a String
 operator = P.operator lexer
 
-reservedOp :: String -> Lex a ()
+reservedOp :: String -> ParseT a ()
 reservedOp = P.reservedOp lexer
 
-charLiteral :: Lex a Char
+charLiteral :: ParseT a Char
 charLiteral = P.charLiteral lexer
 
-stringLiteral :: Lex a String
+stringLiteral :: ParseT a String
 stringLiteral = P.stringLiteral lexer
 
-natural :: Lex a Integer
+natural :: ParseT a Integer
 natural = P.natural lexer
 
-integer :: Lex a Integer
+integer :: ParseT a Integer
 integer = P.integer lexer
 
-float :: Lex a Double
+float :: ParseT a Double
 float = P.float lexer
 
-naturalOrFloat :: Lex a (Either Integer Double)
+naturalOrFloat :: ParseT a (Either Integer Double)
 naturalOrFloat = P.naturalOrFloat lexer
 
-decimal :: Lex a Integer
+decimal :: ParseT a Integer
 decimal = P.decimal lexer
 
-hexadecimal :: Lex a Integer
+hexadecimal :: ParseT a Integer
 hexadecimal = P.hexadecimal lexer
 
-octal :: Lex a Integer
+octal :: ParseT a Integer
 octal = P.octal lexer
 
-symbol :: String -> Lex a String
+symbol :: String -> ParseT a String
 symbol = P.symbol lexer
 
-lexeme :: Lex a b -> Lex a b
+lexeme :: ParseT a b -> ParseT a b
 lexeme = P.lexeme lexer
 
-whiteSpace :: Lex a ()
+whiteSpace :: ParseT a ()
 whiteSpace = P.whiteSpace lexer
 
-parens :: Lex a b -> Lex a b
+parens :: ParseT a b -> ParseT a b
 parens = P.parens lexer
 
-braces :: Lex a b -> Lex a b
+braces :: ParseT a b -> ParseT a b
 braces = P.braces lexer
 
-angles :: Lex a b -> Lex a b
+angles :: ParseT a b -> ParseT a b
 angles = P.angles lexer
 
-brackets :: Lex a b -> Lex a b
+brackets :: ParseT a b -> ParseT a b
 brackets = P.brackets lexer
+
+tTrue, tFalse :: ParseT a Bool
+tTrue  = res "true" True
+tFalse = res "false" False
+
+tNot, tAnd, tOr, tGreater, tLess :: a -> ParseT b a
+tNot     = op "!"
+tAnd     = op "&&"
+tOr      = op "||"
+tGreater = op ">"
+tLess    = op "<"
+
+res, op :: String -> a -> ParseT b a
+res = f reserved
+op  = f reservedOp
+
+f :: Monad m => (a -> m b) -> a -> c -> m c
+f g h x = g h >> return x

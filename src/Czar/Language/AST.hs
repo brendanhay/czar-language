@@ -12,9 +12,9 @@
 
 module Czar.Language.AST where
 
-import Data.Text
+-- import Data.String
 
-type Ident = Text
+type Ident = String
 
 newtype ModName = ModName Ident
   deriving (Show)
@@ -44,15 +44,21 @@ data Arg
     | ARef Ident RefName
   deriving (Show)
 
-data Decl
-    = DRes Ident Ident [Exp]
-    | DExp Exp
-  deriving (Show)
-
 data Perform = Perform ModName [Decl]
   deriving (Show)
 
 data Include = Include ModName [Decl]
+  deriving (Show)
+
+data Decl
+    = DRes Ident Ident [Stmt]
+    | DStmt Stmt
+  deriving (Show)
+
+data Stmt
+    = SLet Ident Exp
+    | SIf Exp Stmt Stmt
+    | SCase Exp [(Pattern, Stmt)]
   deriving (Show)
 
 data Exp
@@ -65,11 +71,14 @@ data Exp
     | EList [Exp]
     | ETuple [Exp]
     | EIf Exp Exp Exp
-    | ECase Exp [Alt]
+    | ECase Exp [(Pattern, Exp)]
   deriving (Show)
 
-data Alt = Alt Pattern Exp
-  deriving (Show)
+refExp :: Ident -> Ident -> Exp
+refExp mod' = ERef . RefName (ModName mod')
+
+boolExp :: Bool -> Exp
+boolExp = EBin . BBool
 
 data Pattern
     = PVar Ident
@@ -80,7 +89,7 @@ data Pattern
 
 data Literal
     = LChar Char
-    | LString Text
+    | LString String
     | LList [Literal]
     | LTuple [Literal]
   deriving (Show)
@@ -111,3 +120,4 @@ data NumOp
     | Multiply
     | Divide
   deriving (Show)
+

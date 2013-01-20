@@ -12,6 +12,7 @@
 
 module Czar.Language.Lexer where
 
+import Data.Char             (isUpper)
 import Data.Functor.Identity (Identity)
 import Text.Parsec
 import Text.Parsec.Language  (emptyDef)
@@ -75,8 +76,24 @@ reservedOps =
     , "&&"
     ]
 
-identifier :: ParseT a String
-identifier = P.identifier lexer
+data Casing = Upper | Lower
+
+-- FIXME: Must be a better way of coercing parsec to
+-- split lower/upper idents
+upperIdent :: ParseT a String
+upperIdent = identifier >>= either
+    return (fail . ("expecting uppercase ident: " ++))
+
+lowerIdent :: ParseT a String
+lowerIdent = identifier >>= either
+    (fail . ("expecting lowercase ident: " ++)) return
+
+identifier :: ParseT a (Either String String)
+identifier = do
+    xs <- P.identifier lexer
+    return $ if isUpper (head xs)
+              then Left xs
+              else Right xs
 
 reserved :: String -> ParseT a ()
 reserved = P.reserved lexer

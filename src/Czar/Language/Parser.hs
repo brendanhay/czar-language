@@ -13,6 +13,7 @@
 module Czar.Language.Parser where
 
 import Control.Applicative   ((<$>), (<*>))
+import Control.Monad         (mzero)
 import Czar.Language.AST
 import Czar.Language.Lexer
 import Data.Functor.Identity (Identity)
@@ -23,7 +24,7 @@ import Text.Parsec.Expr
 type Operators = [[Operator String () Identity Exp]]
 
 expParser :: Parser Exp
-expParser = buildExpressionParser operators termParser <?> "expression"
+expParser = buildExpressionParser operators appExp <?> "expression"
 
 operators :: Operators
 operators = arithmeticOps ++ booleanOps ++ relationalOps
@@ -50,44 +51,52 @@ relationalOps =
     , [Infix (rLess    (ERel Less))    AssocLeft]
     ]
 
-termParser :: Parser Exp
-termParser = EVar <$> lowerIdent
-    <|> letExpParser
-    <|> literalParser
-    <|> parenParser
-    <|> listParser
+appExp :: Parser Exp
+appExp = do
+   es <- many1 termExp
+   case length es of
+      0 -> mzero
+      1 -> return $ head es
+      _ -> return $ foldl1 EApp es
 
-letExpParser :: Parser Exp
-letExpParser = do
+termExp :: Parser Exp
+termExp = EVar <$> lowerIdent
+    <|> letExp
+    <|> literalExp
+    <|> parenExp
+    <|> listExp
+
+letExp :: Parser Exp
+letExp = do
     reserved "let"
     id' <- lowerIdent
     reservedOp "="
     ELet id' <$> expParser
 
-listParser :: Parser Exp
-listParser = list <$> brackets (commaSep expParser)
+listExp :: Parser Exp
+listExp = list <$> brackets (commaSep expParser)
 
-parenParser :: Parser Exp
-parenParser = do
+parenExp :: Parser Exp
+parenExp = do
     xs <- parens (commaSep1 expParser)
     return $ if length xs == 1
               then head xs
               else tuple xs
 
-literalParser :: Parser Exp
-literalParser = boolParser
-    <|> numParser
-    <|> charParser
-    <|> stringParser
+literalExp :: Parser Exp
+literalExp = boolExp
+    <|> numExp
+    <|> charExp
+    <|> stringExp
 
-boolParser :: Parser Exp
-boolParser = litBool <$> (true <|> false)
+boolExp :: Parser Exp
+boolExp = litBool <$> (true <|> false)
 
-numParser :: Parser Exp
-numParser = either litInt litFloat <$> naturalOrFloat
+numExp :: Parser Exp
+numExp = either litInt litFloat <$> naturalOrFloat
 
-charParser :: Parser Exp
-charParser = litChar <$> charLiteral
+charExp :: Parser Exp
+charExp = litChar <$> charLiteral
 
-stringParser :: Parser Exp
-stringParser = litString <$> stringLiteral
+stringExp :: Parser Exp
+stringExp = litString <$> stringLiteral

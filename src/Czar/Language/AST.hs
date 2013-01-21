@@ -23,7 +23,7 @@ data RefName = RefName ModName Ident
 data Module = Module ModName [Manifest] [Exp]
   deriving (Show)
 
-data Manifest = Manifest ModName [Arg] [Perform] [Include] [Decl]
+data Manifest = Manifest ModName [Arg] [Perform] [Include] [Exp]
   deriving (Show)
 
 data Type
@@ -42,21 +42,10 @@ data Arg
     | ARef Ident RefName
   deriving (Show)
 
-data Perform = Perform ModName [Decl]
+data Perform = Perform ModName [Exp]
   deriving (Show)
 
-data Include = Include ModName [Decl]
-  deriving (Show)
-
-data Decl
-    = DRes Ident Ident [Stmt]
-    | DStmt Stmt
-  deriving (Show)
-
-data Stmt
-    = SLet Ident Exp
-    | SIf Exp Stmt Stmt
-    | SCase Exp [(Pattern, Stmt)]
+data Include = Include ModName [Exp]
   deriving (Show)
 
 data Exp

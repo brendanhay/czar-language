@@ -23,6 +23,68 @@ import Text.Parsec.Expr
 
 type Operators = [[Operator String () Identity Exp]]
 
+qualNameParser :: Parser QName
+qualNameParser = QName <$> upperIdent
+
+refNameParser :: Parser RName
+refNameParser = RName <$> qualNameParser <*> lowerIdent
+
+manifestParser :: Parser Manifest
+manifestParser = do
+    reserved "manifest"
+    name <- qualNameParser
+    args <- parens (commaSep argParser)
+    return $ Manifest name args [] [] []
+
+argParser :: Parser Arg
+argParser = litArg <|> refArg <|> typeArg
+
+-- FIXME: Tidy these three up
+litArg :: Parser Arg
+litArg = do
+    name <- lowerIdent
+    reservedOp "="
+    ALit name <$> literalParser
+
+refArg :: Parser Arg
+refArg = do
+    name <- lowerIdent
+    reservedOp "="
+    ARef name <$> refNameParser
+
+typeArg :: Parser Arg
+typeArg = do
+    name <- lowerIdent
+    reservedOp "::"
+    ASig name <$> typeParser
+
+typeParser :: Parser Type
+typeParser = ctorType <|> tupleType <|> listType
+
+listType :: Parser Type
+listType = TList <$> brackets typeParser
+
+tupleType :: Parser Type
+tupleType = parenParser typeParser TTuple
+
+ctorType :: Parser Type
+ctorType = do
+    name <- upperIdent
+    case name of
+        "Char"   -> return TChar
+        "String" -> return TString
+        "Bool"   -> return TBool
+        "Int"    -> return TInt
+        "Float"  -> return TFloat
+        _        -> fail $ "unexpected type constructor: " ++ name
+
+parenParser :: ParseT a b -> ([b] -> b) -> ParsecT String a Identity b
+parenParser p ctor = do
+    xs <- parens (commaSep1 p)
+    return $ if length xs == 1
+              then head xs
+              else ctor xs
+
 expParser :: Parser Exp
 expParser = buildExpressionParser operators appExp <?> "expression"
 
@@ -53,11 +115,11 @@ relationalOps =
 
 appExp :: Parser Exp
 appExp = do
-   es <- many1 termExp
-   case length es of
-      0 -> mzero
-      1 -> return $ head es
-      _ -> return $ foldl1 EApp es
+    es <- many1 termExp
+    case length es of
+        0 -> mzero
+        1 -> return $ head es
+        _ -> return $ foldl1 EApp es
 
 termExp :: Parser Exp
 termExp = EVar <$> lowerIdent
@@ -69,34 +131,30 @@ termExp = EVar <$> lowerIdent
 letExp :: Parser Exp
 letExp = do
     reserved "let"
-    id' <- lowerIdent
+    name <- lowerIdent
     reservedOp "="
-    ELet id' <$> expParser
+    ELet name <$> expParser
 
 listExp :: Parser Exp
 listExp = list <$> brackets (commaSep expParser)
 
 parenExp :: Parser Exp
-parenExp = do
-    xs <- parens (commaSep1 expParser)
-    return $ if length xs == 1
-              then head xs
-              else tuple xs
+parenExp = parenParser expParser ETuple
 
 literalExp :: Parser Exp
-literalExp = boolExp
-    <|> numExp
-    <|> charExp
-    <|> stringExp
+literalExp = ELit <$> literalParser
 
-boolExp :: Parser Exp
-boolExp = litBool <$> (true <|> false)
+literalParser :: Parser Literal
+literalParser = boolLit <|> numLit <|> charLit <|> stringLit
 
-numExp :: Parser Exp
-numExp = either litInt litFloat <$> naturalOrFloat
+boolLit :: Parser Literal
+boolLit = LBool <$> (true <|> false)
 
-charExp :: Parser Exp
-charExp = litChar <$> charLiteral
+numLit :: Parser Literal
+numLit = either LInt LFloat <$> naturalOrFloat
 
-stringExp :: Parser Exp
-stringExp = litString <$> stringLiteral
+charLit :: Parser Literal
+charLit = LChar <$> charLiteral
+
+stringLit :: Parser Literal
+stringLit = LString <$> stringLiteral

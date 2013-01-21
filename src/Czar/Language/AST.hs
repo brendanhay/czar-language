@@ -14,16 +14,28 @@ module Czar.Language.AST where
 
 type Ident = String
 
-newtype ModName = ModName Ident
+newtype QName = QName Ident
   deriving (Show)
 
-data RefName = RefName ModName Ident
+data RName = RName QName Ident
   deriving (Show)
 
-data Module = Module ModName [Manifest] [Exp]
+data Module = Module QName [Manifest] [Exp]
   deriving (Show)
 
-data Manifest = Manifest ModName [Arg] [Perform] [Include] [Exp]
+data Manifest = Manifest QName [Arg] [Perform] [Include] [Exp]
+  deriving (Show)
+
+data Arg
+    = ALit Ident Literal
+    | ARef Ident RName
+    | ASig Ident Type
+  deriving (Show)
+
+data Perform = Perform QName [Exp]
+  deriving (Show)
+
+data Include = Include QName [Exp]
   deriving (Show)
 
 data Type
@@ -36,16 +48,14 @@ data Type
     | TTuple [Type]
   deriving (Eq, Show)
 
-data Arg
-    = AExp Ident Exp
-    | ASig Ident Type
-    | ARef Ident RefName
-  deriving (Show)
-
-data Perform = Perform ModName [Exp]
-  deriving (Show)
-
-data Include = Include ModName [Exp]
+data Literal
+    = LChar Char
+    | LString String
+    | LBool Bool
+    | LInt Integer
+    | LFloat Double
+    | LCons
+    | LNil
   deriving (Show)
 
 data Exp
@@ -69,16 +79,6 @@ data Pattern
     | PWildCard
   deriving (Show)
 
-data Literal
-    = LChar Char
-    | LString String
-    | LBool Bool
-    | LInt Integer
-    | LFloat Double
-    | LCons
-    | LNil
-  deriving (Show)
-
 data BinOp = And | Or
   deriving (Show)
 
@@ -96,21 +96,6 @@ infixl 9 @@
 (@@) :: Exp -> Exp -> Exp
 e1 @@ e2 = EApp e1 e2
 
-litInt :: Integer -> Exp
-litInt = ELit . LInt
-
-litFloat :: Double -> Exp
-litFloat = ELit . LFloat
-
-litChar :: Char -> Exp
-litChar = ELit . LChar
-
-litString :: String -> Exp
-litString = ELit . LString
-
-litBool :: Bool -> Exp
-litBool = ELit . LBool
-
 litCons :: Exp
 litCons = ELit LCons
 
@@ -125,6 +110,3 @@ list = foldr cons litNil
 
 cons :: Exp -> Exp -> Exp
 cons hd tl = litCons @@ hd @@ tl
-
-tuple :: [Exp] -> Exp
-tuple = ETuple

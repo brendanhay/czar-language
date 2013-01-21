@@ -59,6 +59,7 @@ reservedNames =
 reservedOps :: [String]
 reservedOps =
     [ "="
+    , "::"
     , "->"
     , ">"
     , ">="
@@ -171,7 +172,7 @@ rGreater, rLess :: a -> ParseT b a
 rGreater = op ">"
 rLess    = op "<"
 
- :: a -> ParseT b a
+aAdd, aSubtract, aMultiply, aDivide :: a -> ParseT b a
 aAdd      = op "+"
 aSubtract = op "-"
 aMultiply = op "*"

@@ -159,6 +159,12 @@ commaSep = P.commaSep lexer
 commaSep1 :: ParseT a b -> ParseT a [b]
 commaSep1 = P.commaSep1 lexer
 
+dot :: ParseT a String
+dot = P.dot lexer
+
+binding :: ParseT a ()
+binding = reserved "where"
+
 true, false :: ParseT a Bool
 true  = res "true" True
 false = res "false" False
@@ -179,8 +185,5 @@ aMultiply = op "*"
 aDivide   = op "/"
 
 res, op :: String -> a -> ParseT b a
-res = f reserved
-op  = f reservedOp
-
-f :: Monad m => (a -> m b) -> a -> c -> m c
-f g h x = g h >> return x
+res s x = reserved s >> return x
+op s x  = reservedOp s >> return x

@@ -14,7 +14,7 @@ module Czar.Language.AST where
 
 type Ident = String
 
-newtype QName = QName Ident
+newtype QName = QName [Ident]
   deriving (Show)
 
 data RName = RName QName Ident

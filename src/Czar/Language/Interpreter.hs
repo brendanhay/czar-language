@@ -1,5 +1,5 @@
 -- |
--- Module      : Main
+-- Module      : Czar.Language.Interpreter
 -- Copyright   : (c) 2013 Brendan Hay <brendan.g.hay@gmail.com>
 -- License     : This Source Code Form is subject to the terms of
 --               the Mozilla Public License, v. 2.0.
@@ -10,23 +10,11 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Main where
+module Czar.Language.Interpreter where
 
-import Czar.Language.Interpreter
-import System.Console.Readline
+import Czar.Language.AST
+import Czar.Language.Parser
+import Text.Parsec
 
-main :: IO ()
-main = do
-    putStrLn "Starting czar in interpreted mode..."
-    repl
-
-repl :: IO ()
-repl = do
-    mline <- readline "> "
-    case mline of
-        Nothing   -> return ()
-        Just ":q" -> return ()
-        Just line -> do
-            addHistory line
-            print $ parseManifest line
-            repl
+-- parseManifest :: String -> Either ParseError Manifest
+parseManifest = parse expParser ""

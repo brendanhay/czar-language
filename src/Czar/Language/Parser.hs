@@ -24,7 +24,7 @@ import Text.Parsec.Expr
 type Operators = [[Operator String () Identity Exp]]
 
 qualNameParser :: Parser QName
-qualNameParser = QName <$> upperIdent
+qualNameParser = QName <$> sepBy1 upperIdent dot
 
 refNameParser :: Parser RName
 refNameParser = RName <$> qualNameParser <*> lowerIdent
@@ -33,30 +33,24 @@ manifestParser :: Parser Manifest
 manifestParser = do
     reserved "manifest"
     name <- qualNameParser
-    args <- parens (commaSep argParser)
+    args <- option [] $ parens (commaSep argParser)
+    binding
     return $ Manifest name args [] [] []
 
 argParser :: Parser Arg
-argParser = litArg <|> refArg <|> typeArg
+argParser = do
+    name <- lowerIdent
+    choice $ map ($ name) [typeArg, refArg, litArg]
 
 -- FIXME: Tidy these three up
-litArg :: Parser Arg
-litArg = do
-    name <- lowerIdent
-    reservedOp "="
-    ALit name <$> literalParser
+litArg :: String -> Parser Arg
+litArg s = try $ reservedOp "=" >> ALit s <$> literalParser
 
-refArg :: Parser Arg
-refArg = do
-    name <- lowerIdent
-    reservedOp "="
-    ARef name <$> refNameParser
+refArg :: String -> Parser Arg
+refArg s = try $ reservedOp "=" >> ARef s <$> refNameParser
 
-typeArg :: Parser Arg
-typeArg = do
-    name <- lowerIdent
-    reservedOp "::"
-    ASig name <$> typeParser
+typeArg :: String -> Parser Arg
+typeArg s = reservedOp "::" >> ASig s <$> typeParser
 
 typeParser :: Parser Type
 typeParser = ctorType <|> tupleType <|> listType

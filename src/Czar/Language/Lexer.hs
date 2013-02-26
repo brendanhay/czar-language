@@ -50,6 +50,7 @@ reservedNames =
     , "where"
     , "var"
     , "if"
+    , "!"
     , "then"
     , "else"
     , "case"

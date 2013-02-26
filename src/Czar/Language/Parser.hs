@@ -95,7 +95,7 @@ parenParser p ctor = do
               else ctor xs
 
 expParser :: Parser Exp
-expParser = opParser (letExp <|> condExp <|> appExp)
+expParser = opParser (letExp <|> condExp <|> caseExp <|> appExp)
 
 letExp :: Parser Exp
 letExp = do
@@ -112,6 +112,29 @@ condExp = ECond
     <*> branch "else"
   where
     branch w = reserved w >> expParser
+
+caseExp :: Parser Exp
+caseExp = ECase
+    <$> (reserved "case" >> opParser termExp)
+    <*> (reserved "of"   >> many1 matchParser)
+
+matchParser :: Parser (Pattern, Exp)
+matchParser = (,) <$> patternParser <*> (reserved "->" >> termExp)
+
+patternParser :: Parser Pattern
+patternParser = varPat <|> negPat <|> litPat <|> wildPat
+
+varPat :: Parser Pattern
+varPat = PVar <$> lowerIdent
+
+negPat :: Parser Pattern
+negPat = PNeg <$> (reserved "!" >> patternParser)
+
+litPat :: Parser Pattern
+litPat = PLit <$> literalParser
+
+wildPat :: Parser Pattern
+wildPat = reserved "_" >> return PWildCard
 
 appExp :: Parser Exp
 appExp = do
@@ -137,10 +160,10 @@ parenExp :: Parser Exp
 parenExp = parenParser expParser ETuple
 
 litExp :: Parser Exp
-litExp = ELit <$> litParser
+litExp = ELit <$> literalParser
 
-litParser :: Parser Literal
-litParser = boolLit <|> numLit <|> charLit <|> stringLit
+literalParser :: Parser Literal
+literalParser = boolLit <|> numLit <|> charLit <|> stringLit
 
 boolLit :: Parser Literal
 boolLit = LBool <$> (true <|> false)

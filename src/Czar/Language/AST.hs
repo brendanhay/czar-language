@@ -73,7 +73,12 @@ data Pattern
 
 data BinOp = And | Or deriving (Show)
 
-data RelOp = Greater | Less deriving (Show)
+data RelOp
+    = Greater
+    | GreaterEq
+    | Less
+    | LessEq
+      deriving (Show)
 
 data NumOp
     = Add

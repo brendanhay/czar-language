@@ -33,10 +33,10 @@ class Format a where
     fmtPrec _ = fmt
 
 instance Format QName where
-    fmt (QName is) = text . T.pack $ intercalate "." is
+    fmt (QName is) = ident $ intercalate "." is
 
 instance Format RName where
-    fmt (RName q i) = fmt q <$> text (T.pack i)
+    fmt (RName q i) = fmt q <$> ident i
 
 instance Format Manifest where
     fmt (Manifest q bs ds es) = m <$> vfmt ds <$> vfmt es
@@ -44,7 +44,7 @@ instance Format Manifest where
         m = block $ text "manifiest" <+> fmt q <$> fmt bs
 
 instance Format Decl where
-    fmt (Decl i q bs) = block $ text (T.pack i) <+> fmt q <$> fmt bs
+    fmt (Decl i q bs) = block $ ident i <+> fmt q <$> fmt bs
 
 instance Format [Bind] where
     fmt [] = empty
@@ -53,9 +53,9 @@ instance Format [Bind] where
         m = foldl max 0 $ map (length . bindIdent) bs
 
 instance Format (Int, Bind) where
-    fmt (n, AExp i exp)   = binding n i "=" exp
-    fmt (n, ARef i rname) = binding n i "=" rname
-    fmt (n, ASig i typ)   = binding n i "::" typ
+    fmt (n, AExp i exp)   = binding n i equals exp
+    fmt (n, ARef i rname) = binding n i equals rname
+    fmt (n, ASig i typ)   = binding n i (colon <> colon) typ
 
 instance Format Type where
     fmt TInt        = text "Int"
@@ -66,18 +66,63 @@ instance Format Type where
     fmt (TList typ) = list [fmt typ]
     fmt (TTuple ts) = tupled $ map fmt ts
 
+instance Format Literal where
+    fmt (LChar c)   = squotes $ char c
+    fmt (LString s) = dquotes . string $ T.pack s
+    fmt (LBool b)   = text . T.toLower . T.pack $ show b
+    fmt (LInt i)    = integer i
+    fmt (LFloat d)  = double d
+    fmt LCons       = lbracket <> rbracket
+    fmt LNil        = lbracket <> rbracket
+
 instance Format Exp where
-    fmt _ = text "exp"
+    fmt (EVar i)       = ident i
+    fmt (ELet i exp)   = text "let" <+> binding 0 i equals exp
+    fmt (ELit lit)     = fmt lit
+    fmt (ETuple es)    = tupled $ map fmt es
+    fmt (EApp x y bs)  = fmt x <+> fmt y <$> fmt bs
+    fmt (ENeg exp)     = char '!' <> fmt exp
+    fmt (EBin bop x y) = infixOp bop x y
+    fmt (ERel rop x y) = infixOp rop x y
+    fmt (ENum nop x y) = infixOp nop x y
+    fmt (ECond p t e)  = cond p t e
+    fmt (ECase p ms)   = empty
+
+instance Format Pattern where
+    fmt _ = text "pattern"
+
+instance Format BinOp where
+    fmt And = text "and"
+    fmt Or  = text "or"
+
+instance Format RelOp where
+    fmt Greater   = char '>'
+    fmt GreaterEq = text ">="
+    fmt Less      = char '<'
+    fmt LessEq    = text "<="
+
+instance Format NumOp where
+    fmt Add      = char '+'
+    fmt Subtract = char '-'
+    fmt Multiply = char '*'
+    fmt Divide   = char '/'
+
+cond :: (Format a, Format b) => a -> b -> b -> Doc
+cond p t e = nest 2 $ text "if" <+> fmt p <$> b "then" t <$> b "else" e
+  where
+    b w = (text w <+>) . nest 2 . fmt
+
+infixOp :: (Format a, Format b) => a -> b -> b -> Doc
+infixOp op x y = fmt x <+> fmt op <+> fmt y
+
+binding :: Format a => Int -> Ident -> Doc -> a -> Doc
+binding n i sep' f = fill n (ident i) <+> sep' <+> fmt f
+
+ident :: Ident -> Doc
+ident = text . T.pack
 
 vfmt :: Format a => [a] -> Doc
 vfmt = vsep . map fmt
 
-binding :: Format a => Int -> Ident -> Text -> a -> Doc
-binding n ident sep f = fill n (text $ T.pack ident) <+> text sep <+> fmt f
-
 block :: Doc -> Doc
 block = (<> line) . nest 2
-
-infix 4 <?>
-(<?>) :: Maybe Doc -> (Doc -> Doc)
-(<?>) = maybe id (<+>)

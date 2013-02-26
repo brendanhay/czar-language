@@ -14,29 +14,21 @@ module Czar.Language.AST where
 
 type Ident = String
 
-newtype QName = QName [Ident]
-  deriving (Show)
+newtype QName = QName [Ident] deriving (Show)
 
-data RName = RName QName Ident
-  deriving (Show)
+data RName = RName QName Ident deriving (Show)
 
-data Module = Module QName [Manifest] [Exp]
-  deriving (Show)
+data Module = Module QName [Manifest] [Exp] deriving (Show)
 
-data Manifest = Manifest QName [Arg] [Perform] [Include] [Exp]
-  deriving (Show)
+data Manifest = Manifest QName [Bind] [Decl] [Exp] deriving (Show)
 
-data Arg
-    = ALit Ident Literal
+data Decl = Decl Ident QName [Bind] deriving (Show)
+
+data Bind
+    = AExp Ident Exp
     | ARef Ident RName
     | ASig Ident Type
-  deriving (Show)
-
-data Perform = Perform QName [Exp]
-  deriving (Show)
-
-data Include = Include QName [Exp]
-  deriving (Show)
+      deriving (Show)
 
 data Type
     = TInt
@@ -46,7 +38,7 @@ data Type
     | TBool
     | TList Type
     | TTuple [Type]
-  deriving (Eq, Show)
+      deriving (Eq, Show)
 
 data Literal
     = LChar Char
@@ -56,45 +48,43 @@ data Literal
     | LFloat Double
     | LCons
     | LNil
-  deriving (Show)
+      deriving (Show)
 
 data Exp
     = EVar Ident
     | ELet Ident Exp
     | ELit Literal
     | ETuple [Exp]
-    | EApp Exp Exp
+    | EApp Exp Exp [Bind]
     | ENeg Exp
     | EBin BinOp Exp Exp
     | ERel RelOp Exp Exp
     | ENum NumOp Exp Exp
-    | EIf Exp Exp Exp
+    | ECond Exp Exp Exp
     | ECase Exp [(Pattern, Exp)]
-  deriving (Show)
+      deriving (Show)
 
 data Pattern
     = PVar Ident
     | PNeg Pattern
     | PLit Literal
     | PWildCard
-  deriving (Show)
+      deriving (Show)
 
-data BinOp = And | Or
-  deriving (Show)
+data BinOp = And | Or deriving (Show)
 
-data RelOp = Greater | Less
-  deriving (Show)
+data RelOp = Greater | Less deriving (Show)
 
 data NumOp
     = Add
     | Subtract
     | Multiply
     | Divide
-  deriving (Show)
+      deriving (Show)
 
 infixl 9 @@
 (@@) :: Exp -> Exp -> Exp
-e1 @@ e2 = EApp e1 e2
+e1 @@ e2 = EApp e1 e2 []
 
 litCons :: Exp
 litCons = ELit LCons
@@ -110,3 +100,8 @@ list = foldr cons litNil
 
 cons :: Exp -> Exp -> Exp
 cons hd tl = litCons @@ hd @@ tl
+
+bindIdent :: Bind -> Ident
+bindIdent (AExp i _) = i
+bindIdent (ARef i _) = i
+bindIdent (ASig i _) = i

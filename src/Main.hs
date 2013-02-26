@@ -12,13 +12,30 @@
 
 module Main where
 
-import Czar.Language.Interpreter
+import Control.Monad.Identity
+import Czar.Language.Formatter
+import Czar.Language.Parser
 import System.Console.Readline
+import System.IO
+import Text.Parsec.IndentParsec
+
+import qualified Data.Text.Lazy.IO as T
 
 main :: IO ()
 main = do
-    putStrLn "Starting czar in interpreted mode..."
-    repl
+    f <- readFile "share/syntax.cz"
+    either (\e -> putStrLn "Error:" >> print e)
+           (\a -> do
+                putStrLn "\nAST:"
+                print a
+                putStrLn "\nReified:"
+                T.putStrLn $ render a)
+           (parse f)
+
+    putStrLn ""
+
+    -- putStrLn "Starting czar in interpreted mode..."
+    -- repl
 
 repl :: IO ()
 repl = do
@@ -28,5 +45,7 @@ repl = do
         Just ":q" -> return ()
         Just line -> do
             addHistory line
-            print $ parseManifest line
+            print $ parse line
             repl
+
+parse = runIdentity . runGIPT manifestParser () "parseManifest"

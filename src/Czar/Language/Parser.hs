@@ -12,45 +12,58 @@
 
 module Czar.Language.Parser where
 
-import Control.Applicative   ((<$>), (<*>))
-import Control.Monad         (mzero)
+import Control.Applicative                        ((<$>), (<*>))
+import Control.Monad
+import Control.Monad.Identity
 import Czar.Language.AST
 import Czar.Language.Lexer
-import Data.Functor.Identity (Identity)
-import Text.Parsec
-import Text.Parsec.String
+import Text.Parsec                         hiding (between)
 import Text.Parsec.Expr
+import Text.Parsec.IndentParsec.Combinator
+import Text.Parsec.IndentParsec.Prim
 
-type Operators = [[Operator String () Identity Exp]]
+type Operators = [Operator String () (IndentT HaskellLike Identity) Exp]
 
-qualNameParser :: Parser QName
-qualNameParser = QName <$> sepBy1 upperIdent dot
+type Parser a = IndentParsecT String () Identity a
 
-refNameParser :: Parser RName
-refNameParser = RName <$> qualNameParser <*> lowerIdent
+qnameParser :: Parser QName
+qnameParser = QName <$> sepBy1 upperIdent dot
+
+rnameParser :: Parser RName
+rnameParser = RName <$> qnameParser <*> lowerIdent
 
 manifestParser :: Parser Manifest
 manifestParser = do
+    whiteSpace
     reserved "manifest"
-    name <- qualNameParser
-    args <- option [] $ parens (commaSep argParser)
-    binding
-    return $ Manifest name args [] [] []
+    n  <- qnameParser
+    as <- bindingParser
+    is <- many importParser
+    es <- many expParser
+    eof
+    return $ Manifest n as is es
 
-argParser :: Parser Arg
+importParser :: Parser Decl
+importParser = Decl "import"
+    <$> (reserved "import" >> qnameParser)
+    <*> bindingParser
+
+bindingParser :: Parser [Bind]
+bindingParser = option [] $ reserved "where" >> blockOf (many1 argParser)
+
+argParser :: Parser Bind
 argParser = do
-    name <- lowerIdent
-    choice $ map ($ name) [typeArg, refArg, litArg]
+    n <- lowerIdent
+    choice $ map ($ n) [typeBind, refBind, expBind]
 
--- FIXME: Tidy these three up
-litArg :: String -> Parser Arg
-litArg s = try $ reservedOp "=" >> ALit s <$> literalParser
+typeBind :: String -> Parser Bind
+typeBind s = reservedOp "::" >> ASig s <$> typeParser
 
-refArg :: String -> Parser Arg
-refArg s = try $ reservedOp "=" >> ARef s <$> refNameParser
+refBind :: String -> Parser Bind
+refBind s = try $ reservedOp "=" >> ARef s <$> rnameParser
 
-typeArg :: String -> Parser Arg
-typeArg s = reservedOp "::" >> ASig s <$> typeParser
+expBind :: String -> Parser Bind
+expBind s = try $ reservedOp "=" >> AExp s <$> blockOf expParser
 
 typeParser :: Parser Type
 typeParser = ctorType <|> tupleType <|> listType
@@ -63,16 +76,18 @@ tupleType = parenParser typeParser TTuple
 
 ctorType :: Parser Type
 ctorType = do
-    name <- upperIdent
-    case name of
+    n <- upperIdent
+    case n of
         "Char"   -> return TChar
         "String" -> return TString
         "Bool"   -> return TBool
         "Int"    -> return TInt
         "Float"  -> return TFloat
-        _        -> fail $ "unexpected type constructor: " ++ name
+        _        -> fail $ "unexpected type constructor: " ++ n
 
-parenParser :: ParseT a b -> ([b] -> b) -> ParsecT String a Identity b
+parenParser :: GenIndentParsecT HaskellLike String () Identity a
+            -> ([a] -> a)
+            -> ParsecT String () (IndentT HaskellLike Identity) a
 parenParser p ctor = do
     xs <- parens (commaSep1 p)
     return $ if length xs == 1
@@ -80,54 +95,40 @@ parenParser p ctor = do
               else ctor xs
 
 expParser :: Parser Exp
-expParser = buildExpressionParser operators appExp <?> "expression"
-
-operators :: Operators
-operators = arithmeticOps ++ booleanOps ++ relationalOps
-
-arithmeticOps :: Operators
-arithmeticOps =
-    [ [Prefix (aSubtract ENeg)]
-    , [Infix  (aAdd      (ENum Add))      AssocLeft]
-    , [Infix  (aSubtract (ENum Subtract)) AssocLeft]
-    , [Infix  (aMultiply (ENum Multiply)) AssocLeft]
-    , [Infix  (aDivide   (ENum Divide))   AssocLeft]
-    ]
-
-booleanOps :: Operators
-booleanOps =
-    [ [Prefix (bNot ENeg)]
-    , [Infix  (bAnd (EBin And)) AssocLeft]
-    , [Infix  (bOr  (EBin Or))  AssocLeft]
-    ]
-
-relationalOps :: Operators
-relationalOps =
-    [ [Infix (rGreater (ERel Greater)) AssocLeft]
-    , [Infix (rLess    (ERel Less))    AssocLeft]
-    ]
-
-appExp :: Parser Exp
-appExp = do
-    es <- many1 termExp
-    case length es of
-        0 -> mzero
-        1 -> return $ head es
-        _ -> return $ foldl1 EApp es
-
-termExp :: Parser Exp
-termExp = EVar <$> lowerIdent
-    <|> letExp
-    <|> literalExp
-    <|> parenExp
-    <|> listExp
+expParser = opParser (letExp <|> condExp <|> appExp)
 
 letExp :: Parser Exp
 letExp = do
     reserved "let"
-    name <- lowerIdent
+    n <- lowerIdent
     reservedOp "="
-    ELet name <$> expParser
+    e <- termExp
+    return $ ELet n e
+
+condExp :: Parser Exp
+condExp = ECond
+    <$> (reserved "if" >> opParser termExp)
+    <*> branch "then"
+    <*> branch "else"
+  where
+    branch w = reserved w >> expParser
+
+appExp :: Parser Exp
+appExp = do
+    es <- many1 termExp
+    bs <- bindingParser
+    case length es of
+        0 -> mzero
+        1 -> return $ head es
+        _ -> return $ foldl1 (f bs) es
+  where
+    f xs x y = EApp x y xs
+
+termExp :: Parser Exp
+termExp = varExp <|> litExp <|> parenExp <|> listExp
+
+varExp :: Parser Exp
+varExp = EVar <$> lowerIdent
 
 listExp :: Parser Exp
 listExp = list <$> brackets (commaSep expParser)
@@ -135,11 +136,11 @@ listExp = list <$> brackets (commaSep expParser)
 parenExp :: Parser Exp
 parenExp = parenParser expParser ETuple
 
-literalExp :: Parser Exp
-literalExp = ELit <$> literalParser
+litExp :: Parser Exp
+litExp = ELit <$> litParser
 
-literalParser :: Parser Literal
-literalParser = boolLit <|> numLit <|> charLit <|> stringLit
+litParser :: Parser Literal
+litParser = boolLit <|> numLit <|> charLit <|> stringLit
 
 boolLit :: Parser Literal
 boolLit = LBool <$> (true <|> false)
@@ -152,3 +153,30 @@ charLit = LChar <$> charLiteral
 
 stringLit :: Parser Literal
 stringLit = LString <$> stringLiteral
+
+opParser :: Parser Exp -> Parser Exp
+opParser p = buildExpressionParser ops p <?> "expression"
+  where
+    ops = arithmeticOps ++ booleanOps ++ relationalOps
+
+arithmeticOps :: [Operators]
+arithmeticOps =
+    [ [Prefix (aSubtract ENeg)]
+    , [Infix  (aAdd      (ENum Add))      AssocLeft]
+    , [Infix  (aSubtract (ENum Subtract)) AssocLeft]
+    , [Infix  (aMultiply (ENum Multiply)) AssocLeft]
+    , [Infix  (aDivide   (ENum Divide))   AssocLeft]
+    ]
+
+booleanOps :: [Operators]
+booleanOps =
+    [ [Prefix (bNot ENeg)]
+    , [Infix  (bAnd (EBin And)) AssocLeft]
+    , [Infix  (bOr  (EBin Or))  AssocLeft]
+    ]
+
+relationalOps :: [Operators]
+relationalOps =
+    [ [Infix (rGreater (ERel Greater)) AssocLeft]
+    , [Infix (rLess    (ERel Less))    AssocLeft]
+    ]

@@ -12,27 +12,31 @@
 
 module Czar.Language.Lexer where
 
-import Data.Char             (isUpper)
-import Data.Functor.Identity (Identity)
+import Data.Char                     (isUpper)
+import Control.Monad.Identity
 import Text.Parsec
-import Text.Parsec.Language  (emptyDef)
+import Text.Parsec.IndentParsec.Prim
+import Text.Parsec.Language
 
-import qualified Text.Parsec.Token as P
+import qualified Text.Parsec.Token              as P
+import qualified Text.Parsec.IndentParsec.Token as I
 
-type ParseT a b = ParsecT String a Identity b
-
-lexer :: P.GenTokenParser String a Identity
+lexer :: I.IndentTokenParser String () Identity
 lexer = P.makeTokenParser rules
 
-rules :: P.GenLanguageDef String u Identity
-rules = emptyDef
-    { P.commentLine     = "--"
-    , P.nestedComments  = True
-    , P.caseSensitive   = True
-    , P.identStart      = letter
-    , P.identLetter     = alphaNum
-    , P.reservedNames   = reservedNames
+rules :: P.GenLanguageDef String u (IndentT HaskellLike Identity)
+rules = P.LanguageDef
+    { P.commentStart    = ""
+    , P.commentEnd      = ""
+    , P.commentLine     = "--"
+    , P.nestedComments  = False
+    , P.identStart      = letter <|> char '_'
+    , P.identLetter     = alphaNum <|> oneOf "_'"
+    , P.opStart         = P.opLetter rules
+    , P.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
     , P.reservedOpNames = reservedOps
+    , P.reservedNames   = reservedNames
+    , P.caseSensitive   = True
     }
 
 reservedNames :: [String]
@@ -41,12 +45,11 @@ reservedNames =
     , "manifest"
     , "provider"
     , "resource"
-    , "where"
-    , "perform"
     , "include"
-    , "let"
+    , "provide"
+    , "where"
+    , "var"
     , "if"
-    , "unless"
     , "then"
     , "else"
     , "case"
@@ -77,113 +80,62 @@ reservedOps =
     , "&&"
     ]
 
-data Casing = Upper | Lower
-
 -- FIXME: Must be a better way of coercing parsec to
 -- split lower/upper idents
-upperIdent :: ParseT a String
 upperIdent = upperOrLowerIdent >>= either
     return (fail . ("expecting uppercase ident: " ++))
 
-lowerIdent :: ParseT a String
 lowerIdent = upperOrLowerIdent >>= either
     (fail . ("expecting lowercase ident: " ++)) return
 
-upperOrLowerIdent :: ParseT a (Either String String)
 upperOrLowerIdent = do
-    xs <- P.identifier lexer
+    xs <- I.identifier lexer
     return $ if isUpper (head xs)
               then Left xs
               else Right xs
 
-reserved :: String -> ParseT a ()
-reserved = P.reserved lexer
+reserved       = I.reserved lexer
+operator       = I.operator lexer
+reservedOp     = I.reservedOp lexer
+charLiteral    = I.charLiteral lexer
+stringLiteral  = I.stringLiteral lexer
+natural        = I.natural lexer
+integer        = I.integer lexer
+float          = I.float lexer
+naturalOrFloat = I.naturalOrFloat lexer
+decimal        = I.decimal lexer
+hexadecimal    = I.hexadecimal lexer
+octal          = I.octal lexer
+symbol         = I.symbol lexer
+lexeme         = I.lexeme lexer
+whiteSpace     = I.whiteSpace lexer
+parens         = I.parens lexer
+braces         = I.braces lexer
+angles         = I.angles lexer
+brackets       = I.brackets lexer
+commaSep       = I.commaSep lexer
+commaSep1      = I.commaSep1 lexer
+dot            = I.dot lexer
 
-operator :: ParseT a String
-operator = P.operator lexer
-
-reservedOp :: String -> ParseT a ()
-reservedOp = P.reservedOp lexer
-
-charLiteral :: ParseT a Char
-charLiteral = P.charLiteral lexer
-
-stringLiteral :: ParseT a String
-stringLiteral = P.stringLiteral lexer
-
-natural :: ParseT a Integer
-natural = P.natural lexer
-
-integer :: ParseT a Integer
-integer = P.integer lexer
-
-float :: ParseT a Double
-float = P.float lexer
-
-naturalOrFloat :: ParseT a (Either Integer Double)
-naturalOrFloat = P.naturalOrFloat lexer
-
-decimal :: ParseT a Integer
-decimal = P.decimal lexer
-
-hexadecimal :: ParseT a Integer
-hexadecimal = P.hexadecimal lexer
-
-octal :: ParseT a Integer
-octal = P.octal lexer
-
-symbol :: String -> ParseT a String
-symbol = P.symbol lexer
-
-lexeme :: ParseT a b -> ParseT a b
-lexeme = P.lexeme lexer
-
-whiteSpace :: ParseT a ()
-whiteSpace = P.whiteSpace lexer
-
-parens :: ParseT a b -> ParseT a b
-parens = P.parens lexer
-
-braces :: ParseT a b -> ParseT a b
-braces = P.braces lexer
-
-angles :: ParseT a b -> ParseT a b
-angles = P.angles lexer
-
-brackets :: ParseT a b -> ParseT a b
-brackets = P.brackets lexer
-
-commaSep :: ParseT a b -> ParseT a [b]
-commaSep = P.commaSep lexer
-
-commaSep1 :: ParseT a b -> ParseT a [b]
-commaSep1 = P.commaSep1 lexer
-
-dot :: ParseT a String
-dot = P.dot lexer
-
-binding :: ParseT a ()
-binding = reserved "where"
-
-true, false :: ParseT a Bool
+--true, false :: ParseT a Bool
 true  = res "true" True
 false = res "false" False
 
-bNot, bAnd, bOr :: a -> ParseT b a
+--bNot, bAnd, bOr :: a -> ParseT b a
 bNot = op "!"
 bAnd = op "&&"
 bOr  = op "||"
 
-rGreater, rLess :: a -> ParseT b a
+--rGreater, rLess :: a -> ParseT b a
 rGreater = op ">"
 rLess    = op "<"
 
-aAdd, aSubtract, aMultiply, aDivide :: a -> ParseT b a
+-- aAdd, aSubtract, aMultiply, aDivide :: a -> ParseT b a
 aAdd      = op "+"
 aSubtract = op "-"
 aMultiply = op "*"
 aDivide   = op "/"
 
-res, op :: String -> a -> ParseT b a
+-- res, op :: String -> a -> ParseT b a
 res s x = reserved s >> return x
 op s x  = reservedOp s >> return x

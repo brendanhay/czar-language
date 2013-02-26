@@ -15,6 +15,8 @@ module Czar.Language.Formatter (
     ) where
 
 import Prelude
+import Control.Arrow ((***))
+import Control.Monad
 import Czar.Language.AST            hiding (list)
 import Data.List                           (intersperse, intercalate)
 import Data.Text.Lazy                      (Text)
@@ -33,10 +35,10 @@ class Format a where
     fmtPrec _ = fmt
 
 instance Format QName where
-    fmt (QName is) = ident $ intercalate "." is
+    fmt (QName is) = fmtIdent $ intercalate "." is
 
 instance Format RName where
-    fmt (RName q i) = fmt q <$> ident i
+    fmt (RName q i) = fmt q <$> fmtIdent i
 
 instance Format Manifest where
     fmt (Manifest q bs ds es) = m <$> vfmt ds <$> vfmt es
@@ -44,7 +46,7 @@ instance Format Manifest where
         m = block $ text "manifiest" <+> fmt q <$> fmt bs
 
 instance Format Decl where
-    fmt (Decl i q bs) = block $ ident i <+> fmt q <$> fmt bs
+    fmt (Decl i q bs) = block $ fmtIdent i <+> fmt q <$> fmt bs
 
 instance Format [Bind] where
     fmt [] = empty
@@ -53,9 +55,9 @@ instance Format [Bind] where
         m = foldl max 0 $ map (length . bindIdent) bs
 
 instance Format (Int, Bind) where
-    fmt (n, AExp i exp)   = binding n i equals exp
-    fmt (n, ARef i rname) = binding n i equals rname
-    fmt (n, ASig i typ)   = binding n i (colon <> colon) typ
+    fmt (n, AExp i exp)   = fmtBind n i equals exp
+    fmt (n, ARef i rname) = fmtBind n i equals rname
+    fmt (n, ASig i typ)   = fmtBind n i (colon <> colon) typ
 
 instance Format Type where
     fmt TInt        = text "Int"
@@ -76,17 +78,17 @@ instance Format Literal where
     fmt LNil        = lbracket <> rbracket
 
 instance Format Exp where
-    fmt (EVar i)       = ident i
-    fmt (ELet i exp)   = text "let" <+> binding 0 i equals exp
+    fmt (EVar i)       = fmtIdent i
+    fmt (ELet i exp)   = text "let" <+> fmtBind 0 i equals exp
     fmt (ELit lit)     = fmt lit
     fmt (ETuple es)    = tupled $ map fmt es
     fmt (EApp x y bs)  = fmt x <+> fmt y <$> fmt bs
     fmt (ENeg exp)     = char '!' <> fmt exp
-    fmt (EBin bop x y) = infixOp bop x y
-    fmt (ERel rop x y) = infixOp rop x y
-    fmt (ENum nop x y) = infixOp nop x y
-    fmt (ECond p t e)  = cond p t e
-    fmt (ECase p ms)   = empty
+    fmt (EBin bop x y) = fmtInfix bop x y
+    fmt (ERel rop x y) = fmtInfix rop x y
+    fmt (ENum nop x y) = fmtInfix nop x y
+    fmt (ECond p t e)  = fmtCond p t e
+    fmt (ECase p ms)   = fmtCase p ms
 
 instance Format Pattern where
     fmt _ = text "pattern"
@@ -107,22 +109,34 @@ instance Format NumOp where
     fmt Multiply = char '*'
     fmt Divide   = char '/'
 
-cond :: (Format a, Format b) => a -> b -> b -> Doc
-cond p t e = nest 2 $ text "if" <+> fmt p <$> b "then" t <$> b "else" e
-  where
-    b w = (text w <+>) . nest 2 . fmt
-
-infixOp :: (Format a, Format b) => a -> b -> b -> Doc
-infixOp op x y = fmt x <+> fmt op <+> fmt y
-
-binding :: Format a => Int -> Ident -> Doc -> a -> Doc
-binding n i sep' f = fill n (ident i) <+> sep' <+> fmt f
-
-ident :: Ident -> Doc
-ident = text . T.pack
+block :: Doc -> Doc
+block = (<> line) . nest 2
 
 vfmt :: Format a => [a] -> Doc
 vfmt = vsep . map fmt
 
-block :: Doc -> Doc
-block = (<> line) . nest 2
+fmtIdent :: Ident -> Doc
+fmtIdent = text . T.pack
+
+fmtBind :: Format a => Int -> Ident -> Doc -> a -> Doc
+fmtBind n i sep' f = fill n (fmtIdent i) <+> sep' <+> fmt f
+
+fmtInfix :: (Format a, Format b) => a -> b -> b -> Doc
+fmtInfix op x y = fmt x <+> fmt op <+> fmt y
+
+fmtCond :: Exp -> Exp -> Exp -> Doc
+fmtCond p t e = nest 2 $ text "if" <+> fmt p <$> b "then" t <$> b "else" e
+  where
+    b w = (text w <+>) . nest 2 . fmt
+
+fmtCase :: Exp -> [(Pattern, Exp)] -> Doc
+fmtCase p ms = nest 2 $ text "case" <+> fmt p <+> text "of" <$> f ms
+  where
+    -- (Pattern, Exp) -> (Doc, Doc),
+    -- figure out which fst doc is the longest, and fill the others
+    f = nest 2 . vsep . map fmtTuple
+
+    -- m = foldl max 0 $ map (length . bindIdent) bs
+
+fmtTuple :: (Format a, Format b) => (a, b) -> (Doc, Doc)
+fmtTuple (a, b) = (fmt a, fmt b)

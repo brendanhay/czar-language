@@ -1,0 +1,5 @@
+:set -isrc
+:set -XFlexibleInstances
+:set -XOverloadedStrings
+:set -XRecordWildCards
+:set -XTypeSynonymInstances
